@@ -58,6 +58,10 @@ hub.destroy();    // apaga os dados da memória e desmonta
 
 O núcleo (`core`, `io`, `export`, `state`) não depende de DOM e pode ser usado sem a interface (`createStore`, `readBytes`, `mergeTables`, `buildCsv`...). Ao embutir, mantenha a CSP do `index.html` (veja SECURITY.md).
 
+## Visual
+
+Tema roxo `#660099` com acentos lime, cartões brancos e conectores pontilhados entre as etapas. A fonte Plus Jakarta Sans é **hospedada localmente** (pacote `@fontsource`, só em desenvolvimento, licença OFL), então nenhuma requisição a Google Fonts ou CDN é feita e a CSP continua estrita. As cores ficam em variáveis no topo de `src/ui/styles.css`.
+
 ## Estrutura
 
 ```
