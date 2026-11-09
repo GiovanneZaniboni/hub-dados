@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      CSP estrita: nada de scripts/estilos inline, nenhuma conexão de rede (connect-src 'none'),
+      sem frames, formulários, workers ou plugins, e Trusted Types obrigatório para sinks de script.
+      frame-ancestors só funciona como cabeçalho HTTP: veja docs/DEPLOY.md.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; worker-src 'none'; frame-src 'none'; object-src 'none'; media-src 'none'; manifest-src 'none'; form-action 'none'; base-uri 'none'; require-trusted-types-for 'script'; trusted-types 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Hub de Dados</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>Este aplicativo precisa de JavaScript para processar planilhas localmente.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
