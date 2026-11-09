@@ -104,7 +104,7 @@ export function openStructureDialog(store: HubStore, trigger: HTMLElement): void
   const draft = [...before];
   const originalAll = computed.merge.columns;
 
-  openDialog('Editar estrutura de colunas', trigger, (close) => {
+  openDialog('Reordenar ou remover colunas', trigger, (close) => {
     const list = h('ol', { class: 'column-list' });
     const input = h('input', { attrs: { type: 'text', id: 'new-col', maxlength: String(store.limits.maxHeaderChars), autocomplete: 'off' } });
     const message = h('p', { class: 'hint', attrs: { role: 'status' } });
@@ -172,7 +172,7 @@ export function openFixDialog(store: HubStore, trigger: HTMLElement): void {
   const rules = { ...store.getState().fixes };
   const d = computed.diagnostics;
 
-  openDialog('Corrigir dados', trigger, (close) => {
+  openDialog('Corrigir vazios e repetidos', trigger, (close) => {
     const fill = h('input', { attrs: { type: 'text', id: 'fill-text', value: rules.fillEmpty ?? 'N/D', maxlength: '64', autocomplete: 'off', 'aria-label': 'Texto de preenchimento' } });
     const fillCheck = h('input', { attrs: { type: 'checkbox', id: 'fill-check', ...(rules.fillEmpty !== null ? { checked: '' } : {}) } });
     const blank = h('input', { attrs: { type: 'checkbox', ...(rules.removeBlankRows ? { checked: '' } : {}) } });

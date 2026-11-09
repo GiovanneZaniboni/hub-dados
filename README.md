@@ -9,7 +9,7 @@ Pensado para uso interno em empresa com dados sensíveis (LGPD):
 - **Sem Python e sem backend**: só HTML, CSS e TypeScript. Nada para instalar ou manter no servidor.
 - **Uma única dependência de runtime** (`fflate`, para zip), com versão exata e lockfile.
 
-Detalhes do modelo de segurança em [SECURITY.md](SECURITY.md); como publicar em [docs/DEPLOY.md](docs/DEPLOY.md).
+Guia para quem vai usar (pode enviar às pessoas): [docs/GUIA-DE-USO.md](docs/GUIA-DE-USO.md). Detalhes do modelo de segurança em [SECURITY.md](SECURITY.md); como publicar em [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Usar
 
@@ -36,7 +36,7 @@ Fluxo: (1) escolha o **modelo** (define as colunas de destino); (2) adicione os 
 | Colunas 100% numéricas | Exportadas como número no `.xlsx`; poupadas do "preencher vazios" |
 | Zeros à esquerda (`007`) | Preservados como texto |
 
-Correções ("Corrigir dados") e edição de estrutura são **regras persistentes**: continuam valendo ao adicionar/remover arquivos.
+Correções ("Corrigir vazios e repetidos") e edição de estrutura ("Reordenar ou remover colunas") são **regras persistentes**: continuam valendo ao adicionar/remover arquivos.
 
 Formatos aceitos: `.xlsx`, `.csv`, `.tsv`, `.txt`. **`.xls`, `.xlsm` e `.xlsb` são recusados por segurança** (salve como `.xlsx`).
 
@@ -60,7 +60,7 @@ O núcleo (`core`, `io`, `export`, `state`) não depende de DOM e pode ser usado
 
 ## Visual
 
-Tema roxo `#660099` com acentos lime, cartões brancos e conectores pontilhados entre as etapas. A fonte Plus Jakarta Sans é **hospedada localmente** (pacote `@fontsource`, só em desenvolvimento, licença OFL), então nenhuma requisição a Google Fonts ou CDN é feita e a CSP continua estrita. As cores ficam em variáveis no topo de `src/ui/styles.css`.
+Tema roxo `#660099` com acentos lime, cartões e conectores pontilhados entre as etapas. O tema **claro ou escuro acompanha a preferência do sistema** operacional/navegador (CSS `prefers-color-scheme`, sem script e sem gravar nada), então não há botão de troca. A fonte Plus Jakarta Sans é **hospedada localmente** (pacote `@fontsource`, só em desenvolvimento, licença OFL), então nenhuma requisição a Google Fonts ou CDN é feita e a CSP continua estrita. As cores ficam em variáveis no topo de `src/ui/styles.css`.
 
 ## Estrutura
 

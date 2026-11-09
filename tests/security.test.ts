@@ -92,3 +92,16 @@ describe('Content-Security-Policy do index.html', () => {
     expect(html).not.toMatch(/\son[a-z]+=/i);
   });
 });
+
+describe('tema claro/escuro', () => {
+  const css = readFileSync(join(__dirname, '../src/ui/styles.css'), 'utf8');
+
+  it('segue o sistema por CSS puro (sem script nem armazenamento)', () => {
+    expect(css).toContain('@media (prefers-color-scheme: dark)');
+    expect(css).toMatch(/color-scheme:\s*light dark/);
+  });
+
+  it('não deixa fundos brancos fixos fora dos tokens', () => {
+    expect(css).not.toMatch(/background:\s*#fff\b/);
+  });
+});

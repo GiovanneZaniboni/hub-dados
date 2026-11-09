@@ -71,9 +71,25 @@ describe('interface', () => {
     await upload('model-input', [csv('m.csv', 'Nome;Valor\n')]);
     await upload('files-input', [csv('a.csv', 'cliente;preco\nAna;10\n')]);
     expect(hub.getResult()?.columns).toEqual(['Nome', 'Valor', 'Arquivo_Origem']);
-    (Array.from(root.querySelectorAll('button')).find((b) => b.textContent === 'Limpar tudo') as HTMLButtonElement).click();
+    const clear = Array.from(root.querySelectorAll('button')).find((b) => b.textContent === 'Limpar tudo') as HTMLButtonElement;
+    clear.click(); // primeiro clique só pede confirmação
+    expect(hub.getResult()).not.toBeNull();
+    expect(clear.textContent).toContain('Clique de novo');
+    clear.click();
     expect(hub.getResult()).toBeNull();
     expect(root.querySelector('.file-list')).toBeNull();
+  });
+
+  it('guia mostra o próximo passo e o exemplo carrega dados fictícios', async () => {
+    expect(root.querySelector('.guide-text')?.textContent).toContain('Comece por aqui');
+    const sample = Array.from(root.querySelectorAll('button')).find((b) => b.textContent === 'Ver com dados de exemplo') as HTMLButtonElement;
+    sample.click();
+    await tick(150);
+    expect(hub.getResult()?.rows.length).toBe(4);
+    expect(root.querySelectorAll('.file-list li')).toHaveLength(2);
+    expect(root.querySelector('.stage-card.is-current')).not.toBeNull();
+    expect(root.querySelector('.th-origin')).not.toBeNull();
+    expect(root.querySelector('.banner-warn .btn-small')).not.toBeNull();
   });
 
   it('onChange recebe o resultado atual', async () => {

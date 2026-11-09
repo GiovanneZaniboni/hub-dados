@@ -6,6 +6,7 @@ import { buildXlsx } from '../export/xlsx-writer';
 import { readFile } from '../io/read-file';
 import { createStore, type HubStore } from '../state/store';
 import { openFixDialog, openMappingDialog, openStructureDialog } from './dialogs';
+import { makeSample } from './sample';
 import { downloadBlob, formatBytes, formatInt, h, icon, replaceChildrenOf, type IconName } from './dom';
 
 export interface HubOptions {
@@ -19,6 +20,13 @@ export interface HubHandle {
   clear(): void;
   destroy(): void;
 }
+
+const FORMAT_HELP: Record<'xlsx' | 'csv' | 'json' | 'sql', string> = {
+  xlsx: 'Para abrir e editar no Excel',
+  csv: 'Para importar em outro sistema',
+  json: 'Para integrações e programas',
+  sql: 'Para carregar em um banco de dados (SQLite)',
+};
 
 const PREVIEW_ROWS = 200;
 const ACCEPT = '.xlsx,.csv,.tsv,.txt';
@@ -84,6 +92,12 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
   const badge2 = h('div', { class: 'step-index' });
   const badge3 = h('div', { class: 'step-index' });
   const badgePreview = h('div', { class: 'step-index' });
+  // cartões criados mais abaixo; ficam aqui para o guia de próximo passo alternar o destaque
+  let card1!: HTMLElement;
+  let card2!: HTMLElement;
+  let card3!: HTMLElement;
+  let finalCard!: HTMLElement;
+  let cardPreview!: HTMLElement;
 
   const say = (text: string): void => {
     live.textContent = text;
@@ -180,9 +194,20 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
     'fieldset',
     { class: 'modes' },
     h('legend', { class: 'visually-hidden', text: 'Como casar as colunas' }),
-    modeOption('smart', 'Nome e sinônimos', 'Ignora acento e maiúscula; usa dicionário de sinônimos.'),
-    modeOption('position', 'Posição', 'Usa a ordem das colunas do modelo.'),
+    modeOption('smart', 'Pelo nome da coluna (recomendado)', 'Reconhece "E-mail" e "email" como a mesma coluna, mesmo com acento ou maiúscula.'),
+    modeOption('position', 'Pela ordem das colunas', 'A 1ª coluna do arquivo vira a 1ª do modelo, a 2ª vira a 2ª, e assim por diante.'),
   );
+
+  // ---- guia de próximo passo e exemplo ----------------------------------------
+  const guideText = h('p', { class: 'guide-text' });
+  const sampleButton = h('button', { class: 'btn-ghost', text: 'Ver com dados de exemplo', attrs: { type: 'button' }, on: { click: () => void loadSample() } });
+  const guide = h('div', { class: 'guide' }, h('span', { class: 'guide-icon' }, icon('arrowRight', 16)), guideText, sampleButton);
+
+  async function loadSample(): Promise<void> {
+    const sample = makeSample();
+    await ingest([sample.model], true);
+    await ingest(sample.files, false);
+  }
 
   // ---- renderização ------------------------------------------------------------
   function renderModel(): void {
@@ -271,8 +296,77 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
 
   const metric = (label: string, value: string): HTMLElement => h('div', { class: 'metric' }, h('dt', { text: label }), h('dd', { text: value }));
 
-  function banner(kind: 'ok' | 'warn', title: string, detail?: string): HTMLElement {
-    return h('div', { class: `banner banner-${kind}` }, h('span', { class: 'banner-icon' }, icon(kind === 'ok' ? 'check' : 'alert', 18)), h('div', {}, h('strong', { text: title }), detail ? h('p', { text: detail }) : null));
+  function banner(kind: 'ok' | 'warn', title: string, detail?: string, actions: HTMLElement[] = []): HTMLElement {
+    return h(
+      'div',
+      { class: `banner banner-${kind}` },
+      h('span', { class: 'banner-icon' }, icon(kind === 'ok' ? 'check' : 'alert', 18)),
+      h('div', { class: 'banner-body' }, h('strong', { text: title }), detail ? h('p', { text: detail }) : null, actions.length > 0 ? h('div', { class: 'banner-actions' }, ...actions) : null),
+    );
+  }
+
+  const bannerAction = (label: string, onClick: (ev: MouseEvent) => void): HTMLElement => h('button', { class: 'btn-outline btn-small', text: label, attrs: { type: 'button' }, on: { click: onClick } });
+
+  /** De onde veio cada coluna do resultado (só quando o nome de origem difere do destino). */
+  function columnOrigins(): Map<string, string> {
+    const c = store.getComputed();
+    const hasModel = !!store.getState().model;
+    const result = new Map<string, string>();
+    if (!c) return result;
+    const names = new Map<string, Set<string>>();
+    const onlyNew = new Map<string, boolean>();
+    for (const entries of Object.values(c.merge.mappings)) {
+      for (const e of entries) {
+        if (e.target === null) continue;
+        onlyNew.set(e.target, (onlyNew.get(e.target) ?? true) && e.kind === 'new');
+        if (e.source.trim().toLowerCase() !== e.target.trim().toLowerCase()) {
+          const set = names.get(e.target) ?? new Set<string>();
+          set.add(e.source);
+          names.set(e.target, set);
+        }
+      }
+    }
+    for (const [target, set] of names) {
+      const list = [...set];
+      result.set(target, `← ${list.slice(0, 2).join(', ')}${list.length > 2 ? ` +${list.length - 2}` : ''}`);
+    }
+    if (hasModel) {
+      for (const [target, flag] of onlyNew) if (flag && !result.has(target)) result.set(target, 'coluna nova');
+    }
+    return result;
+  }
+
+  function updateGuide(hasRows: boolean, hasWarnings: boolean): void {
+    const st = store.getState();
+    const empty = !st.model && st.files.length === 0;
+    let text: string;
+    let current: HTMLElement;
+    if (empty) {
+      text = 'Comece por aqui: escolha um modelo (opcional) ou vá direto para os arquivos.';
+      current = card1;
+    } else if (st.files.length === 0) {
+      text = 'Modelo carregado. Agora adicione os arquivos que você quer unificar (etapa 2).';
+      current = card2;
+    } else if (!hasRows) {
+      text = 'Os arquivos não têm linhas de dados. Confira se a primeira linha é o cabeçalho.';
+      current = card2;
+    } else if (hasWarnings) {
+      text = 'Confira o aviso laranja na prévia e, se estiver tudo certo, baixe o arquivo final.';
+      current = cardPreview;
+    } else {
+      text = 'Tudo certo! Escolha o formato e baixe o arquivo final.';
+      current = cardPreview;
+    }
+    guideText.textContent = text;
+    sampleButton.hidden = !empty;
+    for (const card of [card1, card2, card3, cardPreview]) {
+      const isCurrent = card === current;
+      card.classList.toggle('is-current', isCurrent);
+      if (isCurrent) card.setAttribute('aria-current', 'step');
+      else card.removeAttribute('aria-current');
+    }
+    card3.classList.toggle('is-idle', st.files.length === 0);
+    finalCard.classList.toggle('is-idle', !hasRows);
   }
 
   function renderResult(): void {
@@ -283,6 +377,7 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
     setBadge(badge3, 3, hasRows);
     setBadge(badgePreview, 4, hasRows && c.diagnostics.rowsWithEmpty === 0 && c.merge.collisionCount === 0);
     for (const [mode, input] of modeInputs) input.checked = store.getState().mode === mode;
+    updateGuide(hasRows, !!c && (c.diagnostics.rowsWithEmpty > 0 || c.merge.collisionCount > 0 || c.merge.duplicateTargets.length > 0));
 
     if (!c) {
       replaceChildrenOf(resultBox, h('div', { class: 'final-empty' }, h('div', { class: 'doc-circle' }, icon('file', 28)), h('p', { class: 'hint', text: 'Carregue um modelo e/ou arquivos para gerar o arquivo final.' })));
@@ -296,28 +391,51 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
     replaceChildrenOf(
       resultBox,
       h('div', { class: 'final-head' }, h('div', { class: 'doc-circle is-ready' }, icon('file', 28), h('span', { class: 'doc-check' }, icon('check', 12))), h('div', {}, h('strong', { text: 'dados_unificados' }), h('span', { class: 'hint', text: 'Pronto para exportar' }))),
-      h('dl', { class: 'metrics' }, metric('Linhas', formatInt(d.rows)), metric('Colunas', formatInt(d.columns)), metric('Vazias', formatInt(d.emptyCells)), metric('Duplicadas', formatInt(d.duplicateRows))),
-      h('div', { class: 'export-group', attrs: { role: 'group', 'aria-label': 'Exportar resultado' } }, h('span', { class: 'export-label', text: 'Exportar para' }), ...FORMATS.map(([f, label]) => h('button', { class: 'btn-outline', text: label, attrs: { type: 'button', 'aria-label': `Exportar em ${label}` }, on: { click: () => exportAs(f) } }))),
+      h(
+        'dl',
+        { class: 'metrics' },
+        metric('Arquivos unificados', formatInt(store.getState().files.length)),
+        metric('Linhas', formatInt(d.rows)),
+        metric('Colunas', formatInt(d.columns)),
+        metric('Células vazias', formatInt(d.emptyCells)),
+        metric('Linhas repetidas', formatInt(d.duplicateRows)),
+      ),
+      h('div', { class: 'export-group', attrs: { role: 'group', 'aria-label': 'Exportar resultado' } }, h('span', { class: 'export-label', text: 'Exportar para' }), ...FORMATS.map(([f, label]) => h('button', { class: 'btn-outline', text: label, attrs: { type: 'button', 'aria-label': `Exportar em ${label}`, title: FORMAT_HELP[f] }, on: { click: () => exportAs(f) } }))),
+      h('p', { class: 'hint format-help', text: 'Excel: abrir e editar · CSV: importar em outro sistema · JSON: integrações · SQL: carregar em banco de dados (SQLite).' }),
     );
 
     // avisos: nada é descartado em silêncio
     const notes: HTMLElement[] = [];
     const warn = d.rowsWithEmpty > 0 || c.merge.collisionCount > 0 || c.merge.duplicateTargets.length > 0;
-    notes.push(
-      warn
-        ? banner('warn', 'Pontos de atenção encontrados', `${formatInt(d.rowsWithEmpty)} linha(s) com campos vazios · ${formatInt(c.merge.collisionCount)} valor(es) descartado(s) por colisão · ${formatInt(d.duplicateRows)} linha(s) duplicada(s). Use "Corrigir dados" ou revise o mapeamento.`)
-        : banner('ok', 'Nenhuma inconsistência encontrada', 'Todos os registros estão preenchidos e integrados.'),
-    );
-    if (c.merge.collisionCount > 0) {
-      notes.push(
-        h(
-          'details',
-          { class: 'note' },
-          h('summary', { text: `${formatInt(c.merge.collisionCount)} valor(es) divergente(s) descartados (duas colunas no mesmo destino)` }),
-          h('ul', {}, ...c.merge.collisions.slice(0, 10).map((x) => h('li', { text: `${x.file}, linha ${x.row}, coluna "${x.column}": mantido "${x.kept}", descartado "${x.discarded}"` }))),
-        ),
-      );
+    const collisionDetails =
+      c.merge.collisionCount > 0
+        ? h(
+            'details',
+            { class: 'note' },
+            h('summary', { text: `${formatInt(c.merge.collisionCount)} valor(es) divergente(s) ignorados (duas colunas no mesmo destino)` }),
+            h('ul', {}, ...c.merge.collisions.slice(0, 10).map((x) => h('li', { text: `${x.file}, linha ${x.row}, coluna "${x.column}": mantido "${x.kept}", ignorado "${x.discarded}"` }))),
+          )
+        : null;
+    if (warn) {
+      const parts: string[] = [];
+      if (d.rowsWithEmpty > 0) parts.push(`${formatInt(d.rowsWithEmpty)} linha(s) com campos vazios (marcados em laranja na prévia)`);
+      if (c.merge.collisionCount > 0) parts.push(`${formatInt(c.merge.collisionCount)} valor(es) ignorados porque duas colunas apontam para o mesmo destino`);
+      if (d.duplicateRows > 0) parts.push(`${formatInt(d.duplicateRows)} linha(s) repetidas`);
+      const actions: HTMLElement[] = [];
+      if (d.rowsWithEmpty > 0 || d.duplicateRows > 0) actions.push(bannerAction('Corrigir vazios e repetidos', (ev) => openFixDialog(store, ev.currentTarget as HTMLElement)));
+      if (collisionDetails) {
+        actions.push(
+          bannerAction('Ver valores ignorados', () => {
+            collisionDetails.open = true;
+            collisionDetails.querySelector('summary')?.focus();
+          }),
+        );
+      }
+      notes.push(banner('warn', 'Confira antes de exportar', `${parts.join('; ')}.`, actions));
+    } else {
+      notes.push(banner('ok', 'Nenhuma inconsistência encontrada', 'Todos os registros estão preenchidos e integrados.'));
     }
+    if (collisionDetails) notes.push(collisionDetails);
     for (const dup of c.merge.duplicateTargets) {
       notes.push(h('p', { class: 'note', text: `${dup.file}: as colunas ${dup.sources.map((s) => `"${s}"`).join(' e ')} apontam para "${dup.target}". Revise o mapeamento.` }));
     }
@@ -333,6 +451,7 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
     // prévia (somente texto, limitada)
     const { grid } = c;
     const shown = grid.rows.slice(0, PREVIEW_ROWS);
+    const origins = columnOrigins();
     replaceChildrenOf(
       previewBox,
       h(
@@ -342,7 +461,10 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
           'table',
           {},
           h('caption', { class: 'visually-hidden', text: `Prévia: ${formatInt(shown.length)} de ${formatInt(grid.rows.length)} linhas` }),
-          h('thead', {}, h('tr', {}, h('th', { attrs: { scope: 'col' }, text: '#' }), ...grid.columns.map((col) => h('th', { attrs: { scope: 'col' }, text: col })))),
+          h('thead', {}, h('tr', {}, h('th', { attrs: { scope: 'col' }, text: '#' }), ...grid.columns.map((col) => {
+            const origin = origins.get(col);
+            return h('th', { attrs: { scope: 'col', ...(origin ? { title: `${col} ${origin}` } : {}) } }, col, origin ? h('span', { class: 'th-origin', text: origin }) : null);
+          }))),
           h('tbody', {}, ...shown.map((r, i) => h('tr', {}, h('th', { attrs: { scope: 'row' }, text: String(i + 1) }), ...grid.columns.map((_, j) => h('td', { class: (r[j] ?? '') === '' ? 'is-empty' : '', text: r[j] ?? '' }))))),
         ),
       ),
@@ -351,8 +473,8 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
 
     replaceChildrenOf(
       footerBox,
-      h('button', { class: 'btn-outline', attrs: { type: 'button' }, on: { click: (ev) => openStructureDialog(store, ev.currentTarget as HTMLElement) } }, icon('columns', 16), 'Editar estrutura'),
-      h('button', { class: 'btn-outline', attrs: { type: 'button' }, on: { click: (ev) => openFixDialog(store, ev.currentTarget as HTMLElement) } }, icon('wand', 16), 'Corrigir dados'),
+      h('button', { class: 'btn-outline', attrs: { type: 'button' }, on: { click: (ev) => openStructureDialog(store, ev.currentTarget as HTMLElement) } }, icon('columns', 16), 'Reordenar ou remover colunas'),
+      h('button', { class: 'btn-outline', attrs: { type: 'button' }, on: { click: (ev) => openFixDialog(store, ev.currentTarget as HTMLElement) } }, icon('wand', 16), 'Corrigir vazios e repetidos'),
       h('button', { class: 'btn-lime', attrs: { type: 'button' }, on: { click: () => exportAs('xlsx') } }, icon('download', 16), 'Baixar arquivo final'),
     );
   }
@@ -367,22 +489,51 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
   const unsubscribe = store.subscribe(render);
 
   // ---- esqueleto estático ---------------------------------------------------------
-  const clearButton = h(
-    'button',
-    {
-      class: 'btn-outline btn-clear',
-      attrs: { type: 'button', title: 'Apaga todos os dados carregados desta sessão' },
-      on: {
-        click: () => {
-          store.clearAll();
-          dismissAlerts();
-          say('Todos os dados foram apagados da memória.');
-        },
+  // Dois cliques para apagar: o primeiro pede confirmação (some sozinho em 5 s ou ao sair do botão).
+  let confirmTimer: ReturnType<typeof setTimeout> | undefined;
+  const setClearState = (confirming: boolean): void => {
+    clearTimeout(confirmTimer);
+    clearButton.classList.toggle('is-confirming', confirming);
+    replaceChildrenOf(clearButton, icon('trash', 16), confirming ? 'Clique de novo para apagar' : 'Limpar tudo');
+    if (confirming) confirmTimer = setTimeout(() => setClearState(false), 5000);
+  };
+  const clearButton = h('button', {
+    class: 'btn-outline btn-clear',
+    attrs: { type: 'button', title: 'Apaga todos os dados carregados desta sessão' },
+    on: {
+      click: () => {
+        if (!clearButton.classList.contains('is-confirming')) {
+          setClearState(true);
+          say('Clique novamente em Limpar tudo para confirmar.');
+          return;
+        }
+        setClearState(false);
+        store.clearAll();
+        dismissAlerts();
+        say('Todos os dados foram apagados da memória.');
       },
+      blur: () => setClearState(false),
     },
-    icon('trash', 16),
-    'Limpar tudo',
+  });
+  setClearState(false);
+
+  const example = h(
+    'p',
+    { class: 'example' },
+    h('span', { class: 'hint', text: 'Exemplo: ' }),
+    h('span', { class: 'tag', text: 'cliente' }),
+    ' ',
+    h('span', { class: 'tag', text: 'preco' }),
+    h('span', { class: 'example-arrow', text: ' → ' }),
+    h('span', { class: 'tag tag-exact', text: 'Nome' }),
+    ' ',
+    h('span', { class: 'tag tag-exact', text: 'Valor' }),
   );
+  card1 = stageCard({ tag: 'ETAPA 01', title: 'Arquivo Modelo', desc: 'A planilha que define as colunas do resultado final. Sem modelo, as colunas vêm dos próprios arquivos.', icon: 'file', badge: badge1, labelId: 'h-model' }, example, modelBox);
+  card2 = stageCard({ tag: 'ETAPA 02', title: 'Arquivos para Unificar', desc: 'Adicione todas as planilhas que deseja juntar em uma só.', icon: 'layers', badge: badge2, labelId: 'h-files' }, filesBox);
+  card3 = stageCard({ tag: 'ETAPA 03', title: 'Como unificar', desc: 'Escolha como as colunas dos arquivos são ligadas às do modelo. Na dúvida, deixe a opção recomendada.', icon: 'wand', badge: badge3, labelId: 'h-mode' }, modes);
+  finalCard = h('section', { class: 'stage-card final-card', attrs: { 'aria-label': 'Arquivo final' } }, resultBox);
+  cardPreview = stageCard({ tag: 'VALIDAÇÃO', title: 'Prévia dos dados', desc: 'Confira os dados consolidados antes de exportar. Cada coluna mostra de onde veio, quando o nome mudou.', icon: 'table', badge: badgePreview, labelId: 'h-preview' }, previewBox, footerBox);
 
   const shell = h(
     'div',
@@ -403,6 +554,7 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
         ),
         h('div', { class: 'header-right' }, h('div', { class: 'steps-pill' }, h('span', { class: 'step-num', text: '3' }), h('span', { text: 'etapas simples' })), clearButton),
       ),
+      guide,
       live,
       alerts,
       h(
@@ -411,24 +563,24 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
         h(
           'div',
           { class: 'col' },
-          stageCard({ tag: 'ETAPA 01', title: 'Arquivo Modelo', desc: 'Define a estrutura e a ordem das colunas do arquivo final.', icon: 'file', badge: badge1, labelId: 'h-model' }, modelBox),
+          card1,
           connectorV(),
-          stageCard({ tag: 'ETAPA 02', title: 'Arquivos para Unificar', desc: 'Adicione todos os arquivos que deseja consolidar.', icon: 'layers', badge: badge2, labelId: 'h-files' }, filesBox),
+          card2,
         ),
         connectorH(),
         h(
           'div',
           { class: 'col' },
-          stageCard({ tag: 'ETAPA 03', title: 'Como unificar', desc: 'Escolha como as colunas dos arquivos são casadas com o modelo.', icon: 'wand', badge: badge3, labelId: 'h-mode' }, modes),
+          card3,
           connectorV(),
-          h('section', { class: 'stage-card final-card', attrs: { 'aria-label': 'Arquivo final' } }, resultBox),
+          finalCard,
         ),
         connectorH(),
         h(
           'div',
           { class: 'col col-wide' },
           bannerBox,
-          stageCard({ tag: 'VALIDAÇÃO', title: 'Prévia dos dados', desc: 'Confira os dados consolidados antes de exportar.', icon: 'table', badge: badgePreview, labelId: 'h-preview' }, previewBox, footerBox),
+          cardPreview,
         ),
       ),
     ),
@@ -442,6 +594,7 @@ export function mountHub(root: HTMLElement, options: HubOptions = {}): HubHandle
     clear: () => store.clearAll(),
     destroy: () => {
       unsubscribe();
+      clearTimeout(confirmTimer);
       store.clearAll();
       root.replaceChildren();
     },
