@@ -15,7 +15,22 @@
 
 ---
 
-## 2. Passo a passo
+## 2. Como abrir (sem instalar nada)
+
+O Hub é **um único arquivo**: `hub-dados.html`. Não precisa instalar programa, nem Node, nem TypeScript, nem servidor.
+
+1. Salve o arquivo `hub-dados.html` no seu computador (por exemplo, na Área de Trabalho).
+2. Dê **dois cliques** nele. Ele abre no navegador (Chrome ou Edge).
+3. Pronto: é só usar. Você pode até desligar a internet que continua funcionando.
+
+Detalhes que ajudam:
+
+- O arquivo é **só o programa**. Seus dados nunca ficam dentro dele.
+- Para atualizar para uma versão nova, troque o arquivo pelo novo.
+- Se o navegador abrir o arquivo como texto, clique com o botão direito no arquivo → **Abrir com** → Chrome ou Edge.
+- Se aparecer um aviso de arquivo baixado da internet, é o Windows sendo cauteloso. Se a empresa fornece o arquivo, confirme com a TI de onde ele veio.
+
+## 3. Passo a passo
 
 ### Etapa 1 — Arquivo Modelo (opcional)
 O modelo é uma planilha que **só precisa ter a linha de títulos** das colunas que você quer no resultado. Exemplo: `Nome | E-mail | Telefone | Valor`.
@@ -68,7 +83,7 @@ A prévia mostra as 200 primeiras linhas, mas **o arquivo exportado tem todas**.
 
 ---
 
-## 3. Entendendo os avisos
+## 4. Entendendo os avisos
 
 | Aviso | O que significa | O que fazer |
 | --- | --- | --- |
@@ -82,7 +97,7 @@ A prévia mostra as 200 primeiras linhas, mas **o arquivo exportado tem todas**.
 
 ---
 
-## 4. Limites e o que não funciona
+## 5. Limites e o que não funciona
 
 - Até **50 arquivos** por vez, **50 MB** cada, **200 mil linhas** por arquivo e **500 mil** no total; até 256 colunas.
 - **Não funcionam:** `.xls` (Excel antigo), `.xlsm` (com macros), `.xlsb`. São recusados de propósito, por segurança. Abra no Excel e use **Salvar como → Pasta de Trabalho do Excel (.xlsx)**.
@@ -94,7 +109,7 @@ A prévia mostra as 200 primeiras linhas, mas **o arquivo exportado tem todas**.
 
 ---
 
-## 5. Problemas comuns
+## 6. Problemas comuns
 
 | Problema | Solução |
 | --- | --- |
@@ -107,18 +122,24 @@ A prévia mostra as 200 primeiras linhas, mas **o arquivo exportado tem todas**.
 
 ---
 
-## 6. Para a equipe de TI
+## 7. Para a equipe de TI
 
-O Hub é um **site estático** (HTML, CSS e JavaScript), sem servidor, sem banco e sem Python. Basta publicar a pasta `dist/` em um servidor web interno.
+O Hub é **HTML, CSS e JavaScript puros**, sem servidor, sem banco e sem Python. Há duas formas de entregar:
+
+- **Arquivo único** (`standalone/hub-dados.html`): abre com duplo clique, sem instalar nada. Estilo e script ficam dentro do arquivo e só são aceitos pelo navegador porque a política de segurança (CSP) lista o "hash" exato de cada um. Qualquer alteração no arquivo faz o navegador bloquear o código.
+- **Pasta `dist/`**, para publicar em um servidor web interno com os cabeçalhos de segurança (veja DEPLOY.md).
+
+Para gerar de novo (só quem tem Node instalado; no Windows use o Prompt de Comando ou `npm.cmd` se o PowerShell bloquear scripts):
 
 ```bash
-npm ci          # instala (scripts de instalação desativados)
-npm run build   # gera a pasta dist/
+npm ci                    # instala (scripts de instalação desativados)
+npm run build:standalone  # gera standalone/hub-dados.html (arquivo único)
+npm run build             # gera a pasta dist/
 ```
 
 - Detalhes de publicação, cabeçalhos HTTP e exemplos de nginx/IIS: [DEPLOY.md](DEPLOY.md).
 - Modelo de segurança e o que **não** está coberto: [../SECURITY.md](../SECURITY.md).
-- Resumo: política de segurança de conteúdo (CSP) estrita sem nenhuma conexão externa, sem armazenamento no navegador, uma única dependência de produção (`fflate`) com versão fixa, sem vulnerabilidades conhecidas na última auditoria (`npm audit`), 105 testes automatizados.
+- Resumo: política de segurança de conteúdo (CSP) estrita sem nenhuma conexão externa, sem armazenamento no navegador, uma única dependência de produção (`fflate`) com versão fixa, sem vulnerabilidades conhecidas na última auditoria (`npm audit`), 109 testes automatizados.
 - **Configure no servidor** os cabeçalhos `frame-ancestors` e HSTS (só funcionam como cabeçalho HTTP).
 - Tema claro ou escuro automático, conforme o sistema do usuário.
 - O Hub pode ser embutido em outro sistema (veja o README).
