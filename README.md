@@ -19,10 +19,6 @@ npm run build          # gera dist/ (HTML + JS + CSS estáticos)
 npm run preview        # http://127.0.0.1:4173
 ```
 
-### Arquivo único (abre com duplo clique)
-
-Para quem não pode instalar Node nem rodar servidor: [standalone/hub-dados.html](standalone/hub-dados.html) é o app inteiro (HTML + CSS + JavaScript + fonte) em **um só arquivo**. Baixe e abra no Chrome ou Edge. Para regenerar depois de mudar o código: `npm run build:standalone`. O script e o estilo são liberados na CSP por hash (sem `unsafe-inline`), e um teste confere que o arquivo está íntegro. Se o PowerShell bloquear o `npm` no Windows, use o Prompt de Comando ou `npm.cmd`.
-
 Em desenvolvimento use `npm run dev`. O servidor de dev do Vite injeta código inline para HMR, então **a CSP estrita só vale em `build` + `preview`**; teste sempre por lá.
 
 Fluxo: (1) escolha o **modelo** (define as colunas de destino); (2) adicione os **arquivos**; (3) confira avisos, ajuste o mapeamento, a estrutura e as correções; (4) exporte.

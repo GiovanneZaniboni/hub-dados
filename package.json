@@ -12,7 +12,6 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "build:standalone": "tsc --noEmit && vite build --config vite.standalone.config.ts && node scripts/make-standalone.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
